@@ -1,0 +1,115 @@
+---
+title: "Correlation and Simple Linear Regression Assignment"
+output: word_document
+---
+
+## Prince Agyabeng
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Libraries needed
+```{r}
+library(tidyverse)
+library(GGally)
+library(car)
+library(lmtest)
+```
+
+Task 1
+Describing the Dataset
+There are 153 observations made up of 6 variables.Also the data is missing vaues for certain columns. I think Ozone will be the response variable
+```{r}
+air = airquality
+str(airquality)
+summary(airquality)
+
+```
+
+Task 2
+Removing of missing data rows  
+There are now 111 observation and 6 varibles of the new data air2
+```{r}
+air2 = airquality %>% drop_na()
+str(air2)
+
+```
+Task 3
+A look at ggpairs plot for visualization and correlation.
+The best variable to predict Ozone appears to be Temp (correlation = 0.699
+
+```{r}
+ggpairs(air2)
+ggcorr(air2, label = TRUE)
+```
+Which variable is most strongly correlated with the “Ozone” variable? Temp
+Which variable is least strongly correlated with the “Ozone” variable? Month
+
+Task 4
+Finding the relationship between Tempe and Ozone
+From the scatterplot, we can validate that there's a strong positive relationship between Temp and Ozone.
+```{r}
+ggplot(air2, aes(x=Temp, y = Ozone)) + geom_point()
+```
+
+Task 5
+Build a regression model1 using Temp to predict Ozone
+```{r}
+model1 = lm(Ozone ~ Temp, data = air2)
+summary(model1)
+
+confint(model1)
+```
+The above model1 is significant as a unit change in Temp -147.64 change in the ozone layer. R2 is 0.488 which is good as as nearly half of the model can explain the data. The Temp variable is significant (p-value < 0.05) and it has explanatory power. The range of the slope falls between -184.818 and -110.473
+
+Task 6
+Plot the model 
+It seems the model is good as the graph indicate a strong relationship between Temp an Ozone
+```{r}
+ggplot(air2, aes(x=Temp, y = Ozone)) + geom_point()+
+  geom_smooth(method= "lm", se = FALSE)
+```
+
+Task 7
+Using the predict function
+```{r}
+testdata = data.frame(Temp = c(80))
+predict(model1, newdata = testdata, interval = "predict")
+```
+
+Task 8
+**Assumption 1** The predictor and response variable mmust have a linear relationship. We can see the graph that there's a linear relationship between Tem and Zone
+```{r}
+ggplot(air2, aes(x=Temp,y=Ozone)) + geom_point() + geom_smooth(method="lm",se=FALSE, color="red") + theme_bw()
+
+```
+
+**Assumption 2** Model errors (residuals) are independent  
+```{r}
+dwtest(model1)
+```
+We fail to reject the null hypothesis with a p-value greater than 0.05. This suggests that the residuals are likely independent.
+
+**Assumption 3** Model residuals exhibit constant variance
+```{r}
+air2 = air2 %>% mutate(resid1 = model1$residuals)
+
+ggplot(air2,aes(x=Temp,y=resid1)) + geom_point() + theme_bw()
+
+```
+From the graph the model residual does not exhibit constant variance thus violating this assumption.
+
+**Assumption 4** Model residuals are Normally-distributed
+```{r}
+ggplot(air2,aes(x=resid1)) + geom_histogram() + theme_bw()
+
+##For a second check
+qqPlot(model1)
+
+```
+From the histogram above, The residuals histogram is not normally distributed, thus violating the normal distribution assumption.
+
+Task 9
+The model in Task 5 can be used to predict the effects of Temp on the Ozone layer. Any unit of increase of Temp has a negative influence on the Ozone. when using this model, one must understand that the modle violates the model residual assumption and the normal distribution assumption.

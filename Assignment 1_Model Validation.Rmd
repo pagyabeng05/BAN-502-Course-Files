@@ -1,0 +1,103 @@
+---
+title: "Model Validation Assignment 1"
+output: word_document
+---
+## Prince Agyabeng
+
+Loading Library
+```{r}
+library(tidyverse)
+library(MASS)
+library(caret)
+```
+Loading the data
+```{r}
+bike <- read_csv("hour.csv")
+str(bike)
+
+bike = bike %>% mutate(season = as_factor(as.character(season))) %>%
+mutate(season = fct_recode(season,
+"Spring" = "1",
+"Summer" = "2",
+"Fall" = "3",
+"Winter" = "4"))
+
+bike = bike %>% mutate(yr = as_factor(as.character(yr)))
+bike = bike %>% mutate(mnth = as_factor(as.character(mnth)))
+bike = bike %>% mutate(hr = as_factor(as.character(hr)))
+str(bike)
+
+bike = bike %>% mutate(holiday = as_factor(as.character(holiday))) %>%
+mutate(holiday = fct_recode(holiday,
+"NotHoliday" = "1",
+"Holiday" = "0"))
+
+bike = bike %>% mutate(workingday = as_factor(as.character(workingday))) %>%
+mutate(workingday = fct_recode(workingday,
+"NotWorkingDay" = "0",
+"WorkingDay" = "1"))
+
+bike = bike %>% mutate(weathersit = as_factor(as.character(weathersit))) %>%
+mutate(weathersit = fct_recode(weathersit,
+"NoPrecip" = "1",
+"Misty" = "2",
+"LightPreci" = "3",
+"HeavyPrecip" = "4"))
+
+bike = bike %>% mutate(weekday = as_factor(as.character(weekday))) %>%
+mutate(weekday = fct_recode(weekday,
+"Sunday" = "0",
+"Monday" = "1",
+"Tuesday" = "2",
+"Wednesday" = "3",
+"Thursday" = "4",
+"Friday" = "5",
+"Saturday" = "6"))
+str(bike)
+```
+
+Task 1 - Training and Testing
+```{r}
+set.seed(1234)
+train.rows = createDataPartition(y = bike$count, p=0.7, list = FALSE)
+train = bike[train.rows,] 
+test = bike[-train.rows,]
+
+```
+Task 2
+There are 12167 observations in the train data set and there're 5212 observations in the testing data sets.
+
+Task 3: Building linear regression model
+```{r}
+Model1 = lm(count ~ season + mnth + hr + holiday + weekday + temp + weathersit, train)
+summary(Model1)
+```
+From Model1, we can see that most of the varibales have significant explanation of the reponse variable. The adjusted R2 for the model1 is 0.62 which means 62% of the train data sets can explained the model.
+
+Task 4 - Prediction on Training set
+```{r}
+predict_train = predict(Model1, train)
+head(predict_train, n = 6)
+```
+From the predict figures, it seems to be negative or inverser relationship between predictors and the response variabe as a unit change in the predictor variables have a negative change in the response variable.
+
+Task 5 - Prediction on testing set
+```{r}
+predict_test = predict(Model1, test)
+head(predict_test, n = 6)
+```
+From the predict figures on the testing data sets, there seems to be positive or direct relationship between most of the predictors and the response variabe as a unit change in the predictor variables may have a more positive change in the response variable.
+
+Task 6 - Calculating the R Square
+```{r}
+SSE = sum((test$count - predict_test)^2)
+
+SST = sum((test$count - mean(test$count))^2) 
+1 - SSE/SST 
+```
+The R Square for the testing model is 0.63 as compard to 0.62 for the training model. This means the model is good for the data.
+
+Task 7 - Difference between K-fold validataion and Training/Testing of models
+In the training/testing validation, a percertage of the data sets is trained whiles percentage is selected to test the train model as a measurement tool to test the performance of the training model. 
+On the other hand, the K fold validation model select specific data sets to test the different varibles for the purpose of testing the performance of each model.
+

@@ -1,0 +1,163 @@
+---
+title: "Classification Trees"
+output: word_document
+---
+
+## Prince Agyabeng
+### Classification Trees
+
+Loading the Libraries
+```{r}
+library(tidyverse)
+library(caret) 
+library(rpart) 
+library(RColorBrewer) 
+library(rattle) 
+```
+
+Loading the data
+```{r}
+parole <- read_csv("parole.csv")
+str(parole)
+summary(parole)
+```
+
+Renaming the factor level of each variable
+```{r}
+parole = parole %>% mutate(male = as_factor(as.character(male))) %>%
+mutate(male = fct_recode(male,
+"male" = "1",
+"female" = "0"))
+
+parole = parole %>% mutate(race = as_factor(as.character(race))) %>%
+mutate(race = fct_recode(race,
+"White" = "1",
+"Other" = "2"))
+
+parole = parole %>% mutate(state = as_factor(as.character(state))) %>%
+mutate(state = fct_recode(state,
+"Kentucky" = "2",
+"Louisiana" = "3",
+"Virginia" = "4",
+"any other state" = "1"))
+
+parole = parole %>% mutate(multiple.offenses = as_factor(as.character(multiple.offenses))) %>%
+mutate(multiple.offenses = fct_recode(multiple.offenses,
+"multiple.offenses" = "1",
+"Otherwise" = "0"))
+
+parole = parole %>% mutate(crime = as_factor(as.character(crime))) %>%
+mutate(crime = fct_recode(crime,
+"larceny" = "2",
+"drug-related crime" = "3",
+"drug-related crime" = "4",
+"any other crime" = "1"))
+
+parole = parole %>% mutate(violator = as_factor(as.character(violator))) %>%
+mutate(violator = fct_recode(violator,
+"violated the parole" = "1",
+"completed the parole without violation" = "0"))
+str(parole)
+
+```
+
+Task 1 - Training the data
+```{r}
+set.seed(12345)
+train.rows = createDataPartition(y = parole$violator, p=0.7, list = FALSE)
+train = parole[train.rows,] 
+test = parole[-train.rows,]
+```
+
+Creating a Classification Tree
+```{r}
+tree1 = rpart(violator  ~., train, method="class")
+fancyRpartPlot(tree1)
+```
+
+Task 3
+In getting an anwer for 40 years Male in Louisiana state and spent 5 years in prison. We have to look at the Classification tree is the man violated the parole, how old was he, what state was he convicted and how many years was he in prison. 
+
+Task 4 - Evaluating the Tree Performance
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+
+A higher CP should be selected as small CP leads to overfitting of the model. A selection of CP value of 0.018 wil be better for the above model.
+
+Prunning the Tree
+```{r}
+tree2 = rpart(violator ~., train, cp=0.018, method="class")
+fancyRpartPlot(tree2)
+summary(tree2)
+```
+Nod number one has the most observation in the training set.
+
+Task 6 -  Predictions and Confusion matrix
+```{r}
+treepred = predict(tree1, train, type = "class")
+head(treepred)
+
+confusionMatrix(treepred,train$violator,positive="completed the parole without violation")
+```
+
+Task 7 - Prediction for Testing data
+```{r}
+treepred2 = predict(tree1, test, type = "class")
+head(treepred2)
+
+confusionMatrix(treepred2,test$violator,positive="completed the parole without violation")
+```
+
+The accuracy for the test data is 0.869 which is lower than the accuracy of the train data of 0.902
+
+Task 8
+Loading the Blood data
+```{r}
+Blood <- read_csv("Blood.csv")
+str(Blood)
+summary(Blood)
+
+Blood = Blood %>% mutate(DonatedMarch  = as.factor(DonatedMarch )) %>% 
+  mutate(DonatedMarch  = fct_recode(DonatedMarch , "No" = "0", "Yes" = "1" ))
+str(Blood)
+```
+
+Task 9 - Training the Blood data
+```{r}
+set.seed(1234)
+train.rows = createDataPartition(y = Blood$DonatedMarch, p=0.7, list = FALSE)
+train2 = Blood[train.rows,] 
+test2 = Blood[-train.rows,]
+```
+
+Classification Tree for Blood data
+```{r}
+tree3 = rpart(DonatedMarch  ~., train2, method="class")
+fancyRpartPlot(tree3)
+
+printcp(tree3)
+plotcp(tree3)
+```
+
+
+Task 10 - Pruning the Classification Tree for Blood data
+```{r}
+tree4 = rpart(DonatedMarch ~., train2, cp=0.050667, method="class")
+
+```
+
+Confusion Matrix for Blood Data
+```{r}
+treepred3 = predict(tree3, train2, type = "class")
+head(treepred3)
+confusionMatrix(treepred3,train2$DonatedMarch,positive="Yes")
+
+
+treepred4 = predict(tree3, test2, type = "class")
+head(treepred4)
+confusionMatrix(treepred4,test2$DonatedMarch,positive="Yes")
+```
+
+The accuracy for the test data is 0.777 which is lower than the accuracy of the train data of 0.813

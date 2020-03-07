@@ -1,0 +1,36 @@
+## Interactions in Regression
+
+Interactions --> The effect of one variable is dependent on the value of another.
+
+Libraries
+```{r}
+library(tidyverse)
+```
+
+Read in data and examine structure
+```{r}
+ad = read_csv("Advertising.csv")
+str(ad)
+```
+
+Basic model of Tv and radio to predict sales.  
+```{r}
+mod1 = lm(sales ~ TV + radio, ad)
+summary(mod1)
+```
+
+Let's examine if there is an interaction effect between TV and radio ads. 
+```{r}
+mod2 = lm(sales ~ TV*radio, ad)
+summary(mod2)
+```
+
+Not happy with the scientific notation?  
+```{r}
+options(scipen = 999)
+
+mod2 = lm(sales ~ TV*radio, ad)
+summary(mod2)
+
+options(scipen = 1)
+```

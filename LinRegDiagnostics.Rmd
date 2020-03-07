@@ -1,0 +1,82 @@
+## Linear Regression Example with Diagnostics
+Libraries
+```{r,warning=FALSE,message=FALSE}
+#install.packages("lmtest","car")
+library(car)
+library(tidyverse)
+library(lmtest)
+```
+
+Read-in the dataset
+```{R}
+insurance = read_csv("insurance.csv")
+```
+
+Examine the data  
+```{r}
+str(insurance)
+summary(insurance)
+```
+
+No missing data evident at this point, but need to do factor conversions.  
+```{r}
+insurance = insurance %>% mutate(sex = as_factor(sex)) %>% mutate(smoker = as_factor(smoker)) %>%
+  mutate(region = as_factor(region))
+summary(insurance)
+```
+
+Confirmed no missing data. Let's build a linear regression model. We'll ignore the categorical variables (sex, smoker, and region) at this point as we have not discussed how such variables are handled in a regression model. Our response variable is "charges".  
+
+Let's select age as our first predictor variable. Start with a plot of age and charges. 
+```{r}
+ggplot(insurance, aes(x=age,y=charges)) + geom_point() + theme_bw()
+```
+This chart suggests something of a linear relationship between these two variables, but there appears to be (perhaps) three separate groups of age and charges relationships. Let's go ahead and build a linear regression model and then look at regression diagnostics (recognizing that we may not get a good model at this point).
+```{r}
+mod1 = lm(charges ~ age, insurance)
+summary(mod1)
+```
+
+Let's look at this regression line on our plot.
+```{r}
+ggplot(insurance, aes(x=age,y=charges)) + geom_point() + geom_smooth(method="lm",se=FALSE, color="red") + theme_bw()
+```
+The regression summary and the plot of the regression line suggest that we do not have a great model at this time. The R-squared and Adjusted R-squared values are not great (around 0.08). However, the age variable itself does appear to be significant (p-value less than 0.05). Each added year predicts an average increase in charges of $257.7.
+
+How do fare as far as our linear regression assumptions go?  
+
+**Assumption 1:** The predictor and response variable have a linear relationship  
+As noted above, it seems reasonable to say that there is something of a linear relationship between these two variables, but there is definitely a "banding" effect occurring that needs to be investigated.  
+
+**Assumption 2:** Model errors (residuals) are independent  
+Let's use the Durbin-Watson Test to examine independence of residuals. The dwtest function is from the lmtest package.  
+```{r}
+dwtest(mod1)
+```
+We fail to reject the null hypothesis with a p-value greater than 0.05. This suggests that the residuals are likely independent.  
+
+**Assumption 3:** Model residuals exhibit constant variance  
+Examine a plot of residuals.  
+```{r}
+insurance = insurance %>% mutate(resid1 = mod1$residuals) #add the model residuals to our data frame
+ggplot(insurance,aes(x=age,y=resid1)) + geom_point() + theme_bw()
+```
+
+Again, we see the "banding" effect (three distinct bands of data points), but there does not appear to be change in the variance of residuals.  
+
+**Assumption 4:** Model residuals are Normally-distributed  
+Examine a histogram of the residuals.  
+```{r}
+ggplot(insurance,aes(x=resid1)) + geom_histogram() + theme_bw()
+```
+
+The residuals histogram is definitely NOT Normal. An alternative to the histogram is the Normal Probability Plot. The qqPlot function is from the car package.  
+```{r}
+qqPlot(mod1)
+```
+The Normal Probability Plot confirms what we saw in the histogram. The black points should be aligned in a straight line from the bottom left to the upper right (as in the plot pictured in the lecture notes).  
+
+
+
+
+

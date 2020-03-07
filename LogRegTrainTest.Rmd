@@ -1,0 +1,197 @@
+## Logistic Regression (Training/Testing Split)
+
+Libraries  
+```{r}
+library(tidyverse)
+library(MASS) #access to forward and backward selection algorithms
+library(leaps) #best subset selection
+library(caret) #for splitting functions
+```
+
+Load data from the CSData.csv file.  
+```{r}
+credit = read_csv("CSData.csv")
+```
+
+Structure and summary
+```{R}
+str(credit)
+summary(credit)
+```
+Factor conversion. Convert the response variable SeriousDlqin2yrs.
+```{r}
+credit = credit %>% mutate(SeriousDlqin2yrs = as.factor(SeriousDlqin2yrs)) %>% 
+  mutate(SeriousDlqin2yrs = fct_recode(SeriousDlqin2yrs, "No" = "0", "Yes" = "1" )) 
+
+str(credit)
+```
+
+There is significant opportunity in this dataset to get rid of unusual values and outliers. We'll do this before splitting. Look at distributions of variables.  
+```{r}
+ggplot(credit, aes(x=RevolvingUtilizationOfUnsecuredLines)) + geom_histogram()
+```
+Strange large value(s) let filter out and re-examine histogram.   
+```{r}
+credit = credit %>% filter(RevolvingUtilizationOfUnsecuredLines < 2)
+ggplot(credit, aes(x=RevolvingUtilizationOfUnsecuredLines)) + geom_histogram()
+```
+This looks much more reasonable.  
+
+```{r}
+ggplot(credit, aes(x=age)) + geom_histogram()
+```
+Age distribution seems reasonable. 
+
+```{r}
+ggplot(credit, aes(x=DebtRatio)) + geom_histogram()
+```
+
+Strange large value(s) let filter out and re-examine histogram.   
+```{r}
+credit = credit %>% filter(DebtRatio < 5)
+ggplot(credit, aes(x=DebtRatio)) + geom_histogram()
+```
+```{r}
+ggplot(credit, aes(x=MonthlyIncome)) + geom_histogram()
+```
+Large value(s) let filter out and re-examine histogram. Also will drop all rows with any NAs.  
+```{r}
+credit = credit %>% filter(MonthlyIncome < 20000) %>% drop_na()
+ggplot(credit, aes(x=MonthlyIncome)) + geom_histogram()
+```
+
+NumberOfOpenCreditLinesAndLoans
+```{r}
+ggplot(credit, aes(x=NumberOfOpenCreditLinesAndLoans)) + geom_bar()
+```
+Remove outliers
+```{r}
+credit = credit %>% filter(NumberOfOpenCreditLinesAndLoans < 40)
+```
+
+```{r}
+ggplot(credit, aes(x=NumberOfTimes90DaysLate)) + geom_bar()
+```
+
+```{r}
+credit = credit %>% filter(NumberOfTimes90DaysLate < 10)
+ggplot(credit, aes(x=NumberOfTimes90DaysLate)) + geom_bar()
+```
+
+```{r}
+ggplot(credit, aes(x=NumberRealEstateLoansOrLines)) + geom_bar()
+```
+
+```{r}
+credit = credit %>% filter(NumberRealEstateLoansOrLines < 10)
+ggplot(credit, aes(x=NumberRealEstateLoansOrLines)) + geom_bar()
+```
+
+```{r}
+ggplot(credit, aes(x=NumberOfDependents)) + geom_bar()
+```
+
+```{r}
+credit = credit %>% filter(NumberOfDependents < 10)
+ggplot(credit, aes(x=NumberOfDependents)) + geom_bar()
+```
+
+Now we'll split the data.  
+```{r}
+set.seed(123) #Note: I left this line out in the video. Please be sure to add it before doing a train/test split so that we all get the same splits!!!
+train.rows = createDataPartition(y = credit$SeriousDlqin2yrs, p=0.7, list = FALSE) #70% in training
+train = credit[train.rows,] 
+test = credit[-train.rows,]
+```
+
+Visualize using the training set (looking at relationship between SeriousDlqin2yrs and the other variables).  
+
+```{r}
+ggplot(train,aes(x=SeriousDlqin2yrs, y=RevolvingUtilizationOfUnsecuredLines)) + geom_boxplot()
+```
+Utilization seems strongly linked with delinquency.  
+
+```{r}
+ggplot(train,aes(x=SeriousDlqin2yrs,y=age)) + geom_boxplot()
+```
+Younger people more likely to be delinquent.  
+
+```{r}
+ggplot(train,aes(x=SeriousDlqin2yrs,y=DebtRatio)) + geom_boxplot()
+```
+Higher debt ratio appears to contribute to delinquency. Hard to see with outliers.  
+
+```{r}
+ggplot(train,aes(x=SeriousDlqin2yrs,y=MonthlyIncome)) + geom_boxplot()
+```
+Higher income --> Less delinquent
+
+```{r}
+ggplot(train,aes(x=SeriousDlqin2yrs,y=NumberOfOpenCreditLinesAndLoans)) + geom_boxplot()
+```
+More lines/loans, perhaps less delinquent.
+
+```{r}
+ggplot(train,aes(x=NumberOfTimes90DaysLate, fill = SeriousDlqin2yrs)) + geom_bar()
+```
+Hard to tell, so look at table.  
+```{r}
+t1 = table(credit$SeriousDlqin2yrs,credit$NumberOfTimes90DaysLate)
+prop.table(t1, margin = 2)
+```
+More late payments, higher rate of delinquency.
+
+```{r}
+ggplot(train,aes(x=NumberRealEstateLoansOrLines, fill = SeriousDlqin2yrs)) + geom_bar()
+```
+
+```{r}
+t2 = table(credit$SeriousDlqin2yrs,credit$NumberRealEstateLoansOrLines)
+prop.table(t2, margin = 2)
+```
+Hard to see much significant difference.
+
+```{r}
+ggplot(train,aes(x=NumberOfDependents, fill = SeriousDlqin2yrs)) + geom_bar()
+```
+```{r}
+t3 = table(credit$SeriousDlqin2yrs,credit$NumberOfDependents)
+prop.table(t3, margin = 2)
+```
+No apparent significant difference.
+
+Let's build a model with revolving utilization.    
+```{r}
+mod1 = glm(SeriousDlqin2yrs ~ RevolvingUtilizationOfUnsecuredLines , train, family = "binomial")
+summary(mod1)
+```
+
+Note the AIC of this model (a measure of model quality) is 35133. We can use this value to compare this model to others. Smaller AIC is better.  
+**Note: In the video my AIC was originally different. I neglected to use a random number seed for the train/test split to ensure that we get the same split everytime. I've added the set.seed command above the splitting process.**
+Try stepwise.  
+
+```{r}
+allmod = glm(SeriousDlqin2yrs ~., train, family = "binomial") 
+summary(allmod)  
+  
+emptymod = glm(SeriousDlqin2yrs~1, train, family = "binomial")  
+summary(emptymod)
+```
+Due to sample size, not suprising that all variables are significant in the full model.  
+
+Backward stepwise 
+```{r}
+#backward
+backmod = stepAIC(allmod, direction = "backward", trace = TRUE) 
+summary(backmod)
+```
+
+Forward stepwise 
+```{r}
+#forward
+forwardmod = stepAIC(emptymod, direction = "forward", scope=list(upper=allmod,lower=emptymod), trace = TRUE) 
+summary(forwardmod) 
+```
+Both models are the same.  Let's go with this model as our final model.  
+
+Before we evaluate the quality of the model on training and testing, we need to do one more thing: threshold selection. We discuss this later.  

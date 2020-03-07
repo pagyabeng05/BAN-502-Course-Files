@@ -1,0 +1,265 @@
+---
+title: "Parameter Selection, Neural Networks, and Ensemble Models"
+output: word_document
+---
+
+## Prince Agyabeng
+
+Loading the libraries
+```{r}
+library(tidyverse)
+library(caret)
+library(rpart)
+library(caretEnsemble)
+library(ranger)
+library(nnet)
+```
+
+
+Loading the data transforming the data
+```{r}
+parole <- read_csv("parole.csv")
+str(parole)
+summary(parole)
+```
+
+
+```{r}
+
+parole = parole %>% mutate(male = as_factor(as.character(male))) %>%
+mutate(male = fct_recode(male,
+"male" = "1",
+"female" = "0"))
+
+parole = parole %>% mutate(race = as_factor(as.character(race))) %>%
+mutate(race = fct_recode(race,
+"White" = "1",
+"Other" = "2"))
+
+parole = parole %>% mutate(state = as_factor(as.character(state))) %>%
+mutate(state = fct_recode(state,
+"Kentucky" = "2",
+"Louisiana" = "3",
+"Virginia" = "4",
+"any other state" = "1"))
+
+parole = parole %>% mutate(multiple.offenses = as_factor(as.character(multiple.offenses))) %>%
+mutate(multiple.offenses = fct_recode(multiple.offenses,
+"multiple.offenses" = "1",
+"Otherwise" = "0"))
+
+parole = parole %>% mutate(crime = as_factor(as.character(crime))) %>%
+mutate(crime = fct_recode(crime,
+"larceny" = "2",
+"drug-related crime" = "3",
+"drug-related crime" = "4",
+"any other crime" = "1"))
+
+parole = parole %>% mutate(violator = as_factor(as.character(violator))) %>%
+mutate(violator = fct_recode(violator,
+"violate_the_parole" = "1",
+"completed_the_parole_without_violation" = "0"))
+str(parole)
+```
+
+
+Task 1 - Splitting the data
+```{r}
+set.seed(12345)
+train.rows = createDataPartition(y = parole$violator, p=0.7, list = FALSE)
+train = parole[train.rows,] 
+test = parole[-train.rows,]
+```
+
+Task 2 - Building Neural network
+```{r}
+start_time = Sys.time() 
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid <-  expand.grid(size = 12, decay = 0.1)
+
+set.seed(1234)
+nnetBasic = train(x=as.data.frame(train[,-9]), y=as.matrix(train$violator),
+                 method = "nnet",
+                 tuneGrid = nnetGrid,
+                 trControl = fitControl,
+                 verbose = FALSE,
+                 trace = FALSE)
+
+end_time = Sys.time()
+end_time-start_time
+
+```
+
+```{r}
+nnetBasic
+```
+
+
+Task 3
+Prediction and Confustion matrix on the basic model
+```{r}
+predNetBasic = predict(nnetBasic, train)
+
+confusionMatrix(predNetBasic, train$violator, positive = "completed_the_parole_without_violation")
+```
+
+The accuracy for the train data is 0.9471 which is good for the model. IT means we are sure that about 95% completed the parole without violation.
+
+
+Task 4 - changing the size
+```{r}
+start_time = Sys.time()
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid =  expand.grid(size = seq(from = 2, to = 12, by = 1), 
+                        decay = seq(from = 0.1, to = 0.5, by = 0.1))
+set.seed(1234)
+nnetFit = train(x=as.data.frame(train[,-9]), y=as.matrix(train$violator),
+                 method = "nnet",
+                 trControl = fitControl,
+                 tuneGrid = nnetGrid,
+                 verbose = FALSE,
+                trace = FALSE)
+
+end_time = Sys.time()
+end_time-start_time
+```
+
+```{r}
+nnetFit
+```
+
+
+Task 5 - Prediction and Confusion on the train data on the fit model
+```{r}
+predNet = predict(nnetFit, train)
+
+confusionMatrix(predNet, train$violator, positive = "completed_the_parole_without_violation")
+```
+
+From the figures above, when the grid search size and decay rates changes, the Accuracy for the prediction is now 0.89 which means that if grid search size and decay rates changes more the accuracy might decrease more thereby affecting the quality of the model.
+
+
+Task 6 - Prediction and Confusion on the test data on the basic model
+```{r}
+
+predNetBasic = predict(nnetBasic, test)
+
+confusionMatrix(predNetBasic, test$violator, positive = "completed_the_parole_without_violation")
+```
+Looking at the  accuracy for the train data on the basic model which is 0.947 and the accuracy  for the test data which is 0.89 for the basic model, it means that the model is good and can be on other data sets.
+
+
+Task 7 - Prediction and Confusion on the test data for the fit model
+```{r}
+predNet = predict(nnetFit, test)
+confusionMatrix(predNet, test$violator, positive = "completed_the_parole_without_violation")
+```
+Looking at the  accuracy for the train data on the fit model which is 0.894 and the accuracy  for the test data which is 0.91 for the fit model, it means that the model is good.
+
+
+Task 8 - Look at both models
+From the train data and test data for the basic model and fit model for the predictions, the models are not overfitting and thus can be test on other data.
+
+
+Task 9
+Building an ensemble model - setting the control object
+```{r}
+control = trainControl(
+  method = "cv",
+  number = 5,
+  savePredictions = "final",
+  classProbs = TRUE, 
+  summaryFunction = twoClassSummary)
+```
+
+
+Method selection for the ensemble model
+```{r}
+set.seed(111)
+model_list = caretList(x=as.data.frame(train[,-9]), y=as.matrix(train$violator) ,
+  metric = "ROC", 
+  trControl= control,
+  methodList=c("glm"),
+tuneList=list(
+rf = caretModelSpec(method="ranger", tuneLength=6),
+rpart = caretModelSpec(method="rpart", tuneLength=6),
+nn = caretModelSpec(method="nnet", tuneLength=6, trace=FALSE)))
+
+```
+
+
+Checking correlation
+```{r}
+as.data.frame(predict(model_list, newdata=head(train)))
+
+modelCor(resamples(model_list))
+```
+The model is not correlated so we can build the model now
+
+```{r}
+ensemble = caretEnsemble(
+  model_list, 
+  metric="ROC",
+  trControl=trainControl(
+    method = "cv", 
+    number= 5,
+    summaryFunction=twoClassSummary,
+    classProbs=TRUE
+    ))
+
+summary(ensemble)
+```
+
+Prediction on ensemble for train data
+```{r}
+pred_ensemble = predict(ensemble, train, type = "raw")
+confusionMatrix(pred_ensemble,train$violator)
+```
+
+Prediction on ensemble for test data
+```{r}
+pred_ensemble_test = predict(ensemble, test, type = "raw")
+confusionMatrix(pred_ensemble_test,test$violator)
+```
+The ensemble model performed well on prediction for both the train data and test data for the accuracy.
+
+
+Task 10
+Building a stacked ensemble mode
+```{r}
+stack = caretStack(
+  model_list, 
+  method ="glm", 
+  metric ="ROC", 
+  trControl = trainControl(
+    method = "cv",
+    number = 5, 
+    savePredictions = "final",
+    classProbs = TRUE,
+    summaryFunction = twoClassSummary
+  )
+)
+
+print(stack)
+```
+The ensemble model perform equally good as the stack model
+
+Train data on the stack model
+```{r}
+pred_stack = predict(stack, train, type = "raw")
+
+confusionMatrix(pred_stack,train$violator)
+```
+
+
+
+```{r}
+pred_stack_test = predict(stack, test, type = "raw")
+
+confusionMatrix(pred_stack_test,test$violator)
+```
+Looking at the  accuracy for the train data on the stack prediction which is 0.96 and the accuracy  for the test data which is 0.91 for the fit model, it means that the model is good.

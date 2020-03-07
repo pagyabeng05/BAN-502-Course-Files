@@ -1,0 +1,132 @@
+## Neural Network 
+
+```{r}
+options(tidyverse.quiet = TRUE)
+library(titanic)
+library(tidyverse)
+library(mice) #package for imputation
+library(VIM) #visualizing missingness
+library(nnet) #for neural networks
+library(caret)
+```
+
+Read in dataset   
+```{r}
+titanic = titanic::titanic_train
+```
+
+Structure and summary
+```{r}
+str(titanic)
+summary(titanic)
+```
+
+Factor conversion and recoding  
+```{r}
+titanic = titanic %>% mutate(Survived = as.factor(Survived)) %>% 
+  mutate(Survived = fct_recode(Survived, "No" = "0", "Yes" = "1" )) %>%
+  mutate(Pclass = as.factor(Pclass)) %>% mutate(Sex = as.factor(Sex)) %>%
+  mutate(Embarked = as.factor(Embarked)) %>% 
+  mutate(Embarked = fct_recode(Embarked,"Unknown"="","Cherbourg"="C","Southampton"="S","Queenstown"="Q"))
+
+titanic$Cabin[titanic$Cabin==""] = NA #convert blanks in cabin to NA
+
+str(titanic)
+```
+
+Column-wise deletion of the "Cabin" variable.  
+```{r}
+titanic = titanic %>% select(-Cabin) 
+vim_plot = aggr(titanic, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+```{r}
+#select only variables relevant to our analysis
+titanic = titanic %>% select(c("Survived","Pclass","Sex","Age","SibSp","Parch","Embarked"))
+
+imp_age = mice(titanic, m=1, method='pmm', printFlag=FALSE)
+summary(imp_age)
+```
+
+Merge the imputed values into our titanic data frame  
+```{r}
+titanic_complete = complete(imp_age) 
+summary(titanic_complete)
+```
+```{r}
+start_time = Sys.time() #for timing
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid <-  expand.grid(size = 12, decay = 0.1)
+
+set.seed(1234)
+nnetBasic = train(Survived ~ ., 
+                 titanic_complete,
+                 method = "nnet",
+                 tuneGrid = nnetGrid,
+                 trControl = fitControl,
+                 verbose = FALSE)
+
+end_time = Sys.time()
+end_time-start_time
+```
+```{r}
+nnetBasic
+```
+
+Predictions  
+```{r}
+predNetBasic = predict(nnetBasic, titanic_complete)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predNetBasic, titanic_complete$Survived, positive = "Yes")
+```
+
+
+```{r}
+start_time = Sys.time() #for timing
+fitControl = trainControl(method = "cv", 
+                           number = 10)
+
+nnetGrid =  expand.grid(size = seq(from = 2, to = 12, by = 1), #rule of thumb --> between # of input and # of output layers
+                        decay = seq(from = 0.1, to = 0.5, by = 0.1))
+set.seed(1234)
+nnetFit = train(Survived ~ ., 
+                 titanic_complete,
+                 method = "nnet",
+                 trControl = fitControl,
+                 tuneGrid = nnetGrid,
+                 verbose = FALSE)
+
+end_time = Sys.time()
+end_time-start_time
+```
+
+```{r}
+nnetFit
+```
+
+Plot  
+```{r}
+plot(nnetFit)
+```
+
+Predictions  
+```{r}
+predNet = predict(nnetFit, titanic_complete)
+```
+
+Confusion matrix
+```{r}
+confusionMatrix(predNet, titanic_complete$Survived, positive = "Yes")
+```
+
+
+
+
+
+
+

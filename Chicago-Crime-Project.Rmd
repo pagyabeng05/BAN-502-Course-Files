@@ -1,0 +1,366 @@
+---
+title: "Project on Chicago"
+output: word_document
+---
+
+## Prince Agyabeng
+
+
+Loading the Libraries
+```{r}
+library(tidyverse)
+library(GGally) 
+library(ggcorrplot)
+library(mice) 
+library(VIM) 
+library(lubridate)
+library(ggcorrplot)
+library(MASS) 
+library(leaps)
+library(caret) 
+library(rpart) 
+library(RColorBrewer) 
+library(rattle) 
+library(ranger)
+library(nnet)
+```
+
+
+Reading the data
+```{r}
+chicago <- read_csv("chicago.csv")
+```
+
+
+Examining the struture and summary of the data
+```{r}
+str(chicago)
+summary(chicago)
+```
+
+Data cleaning and Preparations
+Delete the columns below
+```{r}
+chicago = chicago %>% dplyr::select(-ID) 
+chicago = chicago %>% dplyr::select(-`Case Number`)
+chicago = chicago %>% dplyr::select(-`Updated On`)
+chicago = chicago %>% dplyr::select(-`X Coordinate`)
+chicago = chicago %>% dplyr::select(-`Y Coordinate`)
+chicago = chicago %>% dplyr::select(-`Location`)
+str(chicago)
+
+```
+
+
+Converting the date
+```{r}
+chicago = chicago %>% mutate(Date = mdy_hms(Date))
+str(chicago)
+```
+
+## Preparing the Data
+
+Converting the Month
+```{r}
+chicago = chicago %>% mutate(Month = month(Date))
+str(chicago)
+```
+
+
+
+Converting the hour
+```{r}
+chicago = chicago %>% mutate(Hour = hour(Date))
+str(chicago)
+```
+
+
+
+Factor conversion and recoding  
+```{r}
+chicago = chicago %>% mutate(Year = as_factor(as.character(Year))) %>%
+mutate(Year = fct_recode(Year))
+
+chicago = chicago %>% mutate(Month = as_factor(as.character(Month))) %>%
+mutate(Month = fct_recode(Month,
+ "Jan" = "1",
+"Feb" = "2",
+"March" = "3",
+"April" = "4",
+"May" = "5",
+"June" = "6",
+"July" = "7",
+"Aug" = "8",
+"Sept" = "9",
+"Oct" = "10",
+"Nov" = "11",
+"Dec" = "12"))
+
+chicago = chicago %>% mutate(Hour = as_factor(as.character(Hour))) %>%
+mutate(Hour = fct_recode(Hour))
+
+chicago = chicago %>% mutate(Arrest = as_factor(as.character(Arrest))) %>%
+mutate(Arrest = fct_recode(Arrest,
+"Yes" = "TRUE",
+"No" = "FALSE"))
+
+chicago = chicago %>% mutate(Domestic = as_factor(as.character(Domestic))) %>%
+mutate(Domestic = fct_recode(Domestic,
+"Domestic_violence" = "TRUE",
+"Non_Domestic_violence" = "FALSE"))
+
+chicago = chicago %>% mutate(chicago = as_factor(as.character(`Primary Type`))) %>%
+mutate(`Primary Type` = fct_recode(`Primary Type`))
+
+chicago = chicago %>% mutate(Description = as_factor(as.character(Description))) %>%
+mutate(Description = fct_recode(Description))
+
+chicago = chicago %>% mutate(`Location Description` = as_factor(as.character(`Location Description`))) %>%
+mutate(`Location Description` = fct_recode(`Location Description`))
+
+chicago = chicago %>% mutate(Domestic = as_factor(as.character(Domestic))) %>%
+mutate(Domestic = fct_recode(Domestic))
+
+chicago = chicago %>% mutate(District = as_factor(as.character(District))) %>%
+mutate(District = fct_recode(District))
+
+chicago = chicago %>% mutate(Ward = as_factor(as.character(Ward))) %>%
+mutate(Ward = fct_recode(Ward))
+
+chicago = chicago %>% mutate(`Community Area` = as_factor(as.character(`Community Area`))) %>%
+mutate(`Community Area` = fct_recode(`Community Area`))
+str(chicago)
+
+summary(chicago)
+
+```
+
+Viewing missing valuse
+```{r}
+vim_plot = aggr(chicago, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+Looking at the graph, we need to remov the latitude and longtitude variables as we missing many vaules.
+
+
+```{r}
+chicago = chicago %>% dplyr::select(-Latitude)
+chicago = chicago %>% dplyr::select(-Longitude)
+str(chicago)
+```
+
+
+Viewing additional values
+```{r}
+vim_plot = aggr(chicago, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+
+Deleting rows of missingnes
+```{r}
+chicago = chicago %>% drop_na()
+summary(chicago)
+```
+
+
+viewing the data
+```{r}
+vim_plot = aggr(chicago, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+```
+
+
+
+### Data Exploration
+Begin exploring the data by looking at the count of our response variable only
+```{r}
+ggplot(chicago, aes(x=Arrest, fill = Arrest)) + geom_bar() + theme_bw()
+```
+
+
+`Data visualization
+```{r}
+ggplot(chicago, aes(x=`Primary Type`, fill = Arrest)) + geom_bar() + theme_bw()
+```
+
+There's seems to be relationship between Primary Type  and Arrest. 
+
+
+```{r}
+ggplot(chicago, aes(x=Domestic, fill = Arrest)) + geom_bar() + theme_bw()
+```
+There's no relationship between Domestic and Arrest as issues without domestic violence leads to more arrest
+
+
+```{r}
+ggplot(chicago, aes(x=Month, fill = Arrest)) + geom_bar() + theme_bw()
+```
+From the graph there's a strong relationship between Month and Arrest. In the summer there's seem to be more arrest than the other months.
+
+
+```{r}
+ggplot(chicago, aes(x=District, fill = Arrest)) + geom_bar() + theme_bw()
+```
+
+
+
+## Building Predictive model
+
+Selecting important variables
+```{r}
+chicago2 = chicago %>% dplyr::select("Arrest", "Description", "Domestic", "Ward", "Month", "Year", "Location Description", "District")
+```
+
+
+
+Splitting the data
+```{r}
+set.seed(123)
+train.rows = createDataPartition(y = chicago$Arrest, p=0.7, list = FALSE)
+train = chicago2[train.rows,] 
+test = chicago2[-train.rows,]
+```
+
+
+Visualize using the training set (looking at relationship between SeriousDlqin2yrs and the other variables).  
+```{r}
+ggplot(train,aes(x=Month, fill = Arrest)) + geom_bar()
+
+```
+
+
+Finding more relationhips
+```{r}
+ggplot(train, aes(Month,Arrest))+
+  geom_boxplot(aes(color = Month, fill=Arrest))
+
+```
+
+
+Let's build a model with Month
+```{r}
+mod1 = glm(Arrest ~ Month , train, family = "binomial")
+summary(mod1)
+```
+Note the AIC of this model (a measure of model quality) is 186,749. We can use this value to compare this model to others. Smaller AIC is better.  
+
+##Building Classification
+For Further Analysis, let's build Classification tree
+```{r}
+tree1 = rpart(Arrest ~., train, method="class")
+fancyRpartPlot(tree1)
+
+```
+
+
+```{r}
+printcp(tree1)
+plotcp(tree1)
+```
+
+
+
+Prediction on the training set
+```{r}
+treepred = predict(tree1, train, type = "class")
+head(treepred)
+```
+
+
+A look at the Accuracy on the training set
+```{r}
+confusionMatrix(treepred,train$Arrest,positive="Yes")
+```
+
+
+Prediction on the test set
+```{r}
+treepred_test = predict(tree1, test, type = "class")
+head(treepred_test)
+```
+
+
+Confusion Matrix on the test set
+```{r}
+confusionMatrix(treepred_test,test$Arrest,positive="Yes")
+```
+
+
+###Building Random Forest Model with Caret
+Building a Random Forest
+```{r}
+fit_control = trainControl(method = "cv",  
+                           number = 5) 
+
+
+set.seed(123)  
+rf_fit = train(Arrest~Month,train,
+                 method = "ranger", 
+                 importance = "permutation",
+                 trControl = fit_control,
+               num.trees = 10)
+```
+
+
+Checking the Random Forest
+```{r}
+varImp(rf_fit)
+rf_fit
+```
+
+
+Prediction of Random Forest
+```{r}
+predRF = predict.train(rf_fit, train)
+head(predRF)
+```
+
+
+Accuracy for Random Forest
+```{r warning=TRUE}
+confusionMatrix(predRF, train$Arrest, positive = "Yes")
+```
+
+
+
+### Building Neural Network
+```{r}
+start_time = Sys.time() 
+fitControl = trainControl(method = "cv", 
+                           number = 5)
+
+nnetGrid <-  expand.grid(size = 6, decay = 0.1)
+
+set.seed(1234)
+nnetBasic = train(Arrest~Month,train,
+                 method = "nnet",
+                 tuneGrid = nnetGrid,
+                 trControl = fitControl,
+                 verbose = FALSE,
+                 trace = FALSE)
+
+end_time = Sys.time()
+end_time-start_time
+```
+
+
+```{r}
+nnetBasic
+```
+
+
+Prediction and Confustion matrix Neural Network
+```{r}
+predNetBasic = predict(nnetBasic, train)
+
+confusionMatrix(predNetBasic, train$Arrest, positive = "Yes")
+```
+
+
+Making Prediction on the test data
+```{r}
+predNetBasic = predict(nnetBasic, test)
+
+confusionMatrix(predNetBasic, test$Arrest, positive = "Yes")
+```
+
+
+
