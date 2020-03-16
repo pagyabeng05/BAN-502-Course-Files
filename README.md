@@ -1,2 +1,2 @@
-# BAN-502-Course-Files
+# BAN-502-Predictive Analytics
 Course on Predictive Analytics taken at UNC Wilmington
